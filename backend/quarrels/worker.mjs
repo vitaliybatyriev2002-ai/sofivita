@@ -46,20 +46,31 @@ export default {
       // Idempotent migration preserves the existing counter; timestamps are server-generated.
       await env.DB.batch([env.DB.prepare(historyTable), env.DB.prepare(historyTrigger)]);
       await env.DB.prepare('CREATE TABLE IF NOT EXISTS quarrel_event_authors (event_id INTEGER PRIMARY KEY, actor TEXT NOT NULL)').run();
+      await env.DB.batch([
+        env.DB.prepare('CREATE TABLE IF NOT EXISTS quarrel_event_details (event_id INTEGER PRIMARY KEY, actor TEXT, reason TEXT)'),
+        // Requested correction: 23 October 2026, 00:07 Moscow = 22 October 21:07 UTC.
+        env.DB.prepare("UPDATE quarrel_events SET created_at = '2026-10-22T21:07:00.000Z' WHERE id = 10 AND delta > 0 AND created_at != '2026-10-22T21:07:00.000Z'"),
+        env.DB.prepare("INSERT OR IGNORE INTO quarrel_event_details (event_id, reason) SELECT id, 'тирлист' FROM quarrel_events WHERE id = 10 AND delta > 0"),
+      ]);
       let statement;
       let actor = null;
+      let reason = null;
       if (request.method === 'POST') {
         if (!allowed) return reply({ error: 'Origin required' }, 403);
         if (!request.headers.get('Content-Type')?.startsWith('application/json')) {
           return reply({ error: 'JSON required' }, 415);
         }
         const body = await request.text();
-        if (body.length > 128) return reply({ error: 'Body too large' }, 413);
+        if (body.length > 4096) return reply({ error: 'Body too large' }, 413);
         let data;
         try { data = JSON.parse(body); } catch { return reply({ error: 'Invalid JSON' }, 400); }
         if (data?.actor != null && !['vitalya', 'sonya'].includes(data.actor)) return reply({ error: 'Invalid actor' }, 400);
         actor = data.actor || null;
         if (data?.delta !== 1 && data?.delta !== -1) return reply({ error: 'Invalid delta' }, 400);
+        reason = typeof data.reason === 'string' ? data.reason.trim() : '';
+        if (data.delta === 1 && (!reason || reason.length > 500)) return reply({ error: 'Reason required (1-500 characters)' }, 400);
+        if (data.delta === 1 && !actor) return reply({ error: 'Actor required' }, 400);
+        if (data.delta === -1) reason = null;
         // One atomic update: simultaneous clicks cannot overwrite each other.
         statement = env.DB.prepare(
           'UPDATE quarrels SET count = min(9007199254740991, max(0, count + ?)) WHERE id = 1 AND count + ? BETWEEN 0 AND 9007199254740991 RETURNING count'
@@ -70,11 +81,11 @@ export default {
       const statements = [statement];
       if (request.method === 'POST') {
         statements.push(env.DB.prepare(
-          'INSERT INTO quarrel_event_authors (event_id, actor) SELECT id, ? FROM quarrel_events WHERE id = (SELECT max(id) FROM quarrel_events) AND changes() > 0 AND ? IS NOT NULL'
-        ).bind(actor, actor));
+          'INSERT INTO quarrel_event_details (event_id, actor, reason) SELECT id, ?, ? FROM quarrel_events WHERE id = (SELECT max(id) FROM quarrel_events) AND changes() > 0'
+        ).bind(actor, reason));
       }
       statements.push(env.DB.prepare('SELECT count FROM quarrels WHERE id = 1'));
-      statements.push(env.DB.prepare('SELECT e.id, e.delta, e.count_after, e.created_at, a.actor FROM quarrel_events e LEFT JOIN quarrel_event_authors a ON a.event_id = e.id ORDER BY e.id DESC LIMIT 30'));
+      statements.push(env.DB.prepare('SELECT e.id, e.delta, e.count_after, e.created_at, COALESCE(d.actor, a.actor) AS actor, d.reason FROM quarrel_events e LEFT JOIN quarrel_event_authors a ON a.event_id = e.id LEFT JOIN quarrel_event_details d ON d.event_id = e.id ORDER BY e.id DESC LIMIT 30'));
       const result = await env.DB.batch(statements);
       const row = result[result.length - 2].results[0];
       if (!row || !Number.isSafeInteger(row.count) || row.count < 0) throw new Error('Database not initialized');

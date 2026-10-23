@@ -16,6 +16,7 @@
   const plural = new Intl.PluralRules('ru-RU');
   const units = { one: 'ссора', few: 'ссоры', many: 'ссор', other: 'ссоры' };
   const actors = [...card.querySelectorAll('[data-quarrels-actor]')];
+  const reasonInput = card.querySelector('[data-quarrels-reason]');
   let actor = null;
   let count = null;
   let pending = false;
@@ -25,7 +26,7 @@
     buttons.forEach(button => {
       button.disabled = !apiUrl || !actor || pending || count === null ||
         (button.dataset.quarrelsDelta === '-1' && count === 0) ||
-        (button.dataset.quarrelsDelta === '1' && count === Number.MAX_SAFE_INTEGER);
+        (button.dataset.quarrelsDelta === '1' && (count === Number.MAX_SAFE_INTEGER || !reasonInput?.value.trim()));
     });
     card.setAttribute('aria-busy', String(pending));
   }
@@ -68,9 +69,18 @@
       const time = document.createElement('time');
       const forgotten = event.id >= 1 && event.id <= 9 && event.delta > 0;
       if (!forgotten) time.dateTime = event.created_at;
-      const date = new Date(event.created_at);
+      const date = new Date(event.id === 10 && event.delta > 0 ? '2026-10-22T21:07:00.000Z' : event.created_at);
+      if (event.id === 10 && event.delta > 0) time.dateTime = date.toISOString();
       time.textContent = forgotten ? 'время забыто, время утекло, окда)' : dateFormat.format(date) + ' · ' + timeFormat.format(date) + ' МСК';
-      copy.append(title, time);
+      copy.append(title);
+      const reason = event.id === 10 && event.delta > 0 ? 'тирлист' : event.reason;
+      if (typeof reason === 'string' && reason.trim()) {
+        const detail = document.createElement('p');
+        detail.className = 'quarrels-event-reason';
+        detail.textContent = reason;
+        copy.append(detail);
+      }
+      copy.append(time);
       const total = document.createElement('span');
       total.className = 'quarrels-event-total';
       total.textContent = 'Всего: ' + format.format(event.count_after);
@@ -93,14 +103,17 @@
 
   async function refresh(delta = null) {
     if (pending || (delta !== null && (!apiUrl || !actor))) return;
+    const submittedReason = reasonInput?.value.trim() || '';
+    if (delta === 1 && !submittedReason) { reasonInput?.focus(); return; }
     pending = true;
     updateButtons();
     try {
       const options = delta === null ? {} : {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ delta, actor }),
+        body: JSON.stringify({ delta, actor, reason: delta === 1 ? submittedReason : null }),
       };
       render(await read(apiUrl || dataUrl, options));
+      if (delta === 1 && reasonInput?.value.trim() === submittedReason) reasonInput.value = '';
       status.textContent = apiUrl ? '' : 'Кнопки скоро заработают ♡';
     } catch {
       status.textContent = delta !== null
@@ -126,6 +139,7 @@
     await refresh();
   }
 
+  reasonInput?.addEventListener('input', updateButtons);
   actors.forEach(input => input.addEventListener('change', () => { actor = input.value; updateButtons(); }));
   buttons.forEach(button => button.addEventListener('click', () => refresh(Number(button.dataset.quarrelsDelta))));
   start();

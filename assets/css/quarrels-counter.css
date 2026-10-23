@@ -58,3 +58,10 @@
 .theme-night .quarrels-actor input:checked+span{background:#b57896}
 @media(max-width:760px){.quarrels-actor{justify-content:center}.quarrels-actor legend{text-align:center}}
 @media(prefers-reduced-motion:reduce){.quarrels-actor span{transition:none}}
+
+.quarrels-reason-label{display:flex;align-items:center;gap:9px;justify-content:space-between;margin-top:18px;color:var(--qc-ink);font:500 11px/1.6 Manrope,Arial,sans-serif;width:100%;max-width:340px}
+.quarrels-reason-label span{color:var(--qc-muted);font-weight:400;font-size:9px}
+.quarrels-reason-input{display:block;box-sizing:border-box;resize:vertical;width:100%;max-width:340px;min-height:76px;margin:8px 0 0;padding:12px 14px;border:1px solid var(--qc-line);border-radius:14px;background:#ffffff80;color:var(--qc-ink);font:400 16px/1.5 Manrope,Arial,sans-serif;outline-offset:3px}
+.quarrels-reason-input::placeholder{color:var(--qc-muted);opacity:.8}.quarrels-reason-input:focus{outline:2px solid #a76885}
+.quarrels-event-reason{margin:4px 0;color:var(--qc-ink);font:400 12px/1.65 Manrope,Arial,sans-serif;white-space:pre-wrap;overflow-wrap:anywhere}
+.theme-night .quarrels-reason-input{background:#201e2b33}
