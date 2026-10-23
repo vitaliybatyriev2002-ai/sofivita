@@ -4,6 +4,11 @@
   const value = card.querySelector('[data-quarrels-value]');
   const unit = card.querySelector('[data-quarrels-unit]');
   const status = card.querySelector('[data-quarrels-status]');
+  const historyList = card.querySelector('[data-quarrels-history]');
+  const historyEmpty = card.querySelector('[data-quarrels-history-empty]');
+  const dateFormat = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', day: '2-digit', month: 'long', year: 'numeric' });
+  const timeFormat = new Intl.DateTimeFormat('ru-RU', { timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit' });
+  let historySignature = null;
   const buttons = [...card.querySelectorAll('[data-quarrels-delta]')];
   const dataUrl = new URL(card.dataset.counterSource, document.baseURI);
   const configUrl = new URL('quarrels-config.json', dataUrl);
@@ -33,8 +38,46 @@
     } finally { clearTimeout(timeout); }
   }
 
+  function renderHistory(data) {
+    if (!historyList || !historyEmpty) return;
+    if (!Array.isArray(data.history)) return; // Compatible with the previous Worker during deployment.
+    const events = data.history.filter(event =>
+      Number.isSafeInteger(event.id) && Number.isSafeInteger(event.delta) &&
+      Number.isSafeInteger(event.count_after) && event.count_after >= 0 &&
+      typeof event.created_at === 'string' && Number.isFinite(Date.parse(event.created_at))
+    );
+    const signature = JSON.stringify(events);
+    if (signature === historySignature) return;
+    historySignature = signature;
+    historyList.replaceChildren();
+    historyEmpty.textContent = 'Здесь пока тихо ♡';
+    historyEmpty.hidden = events.length > 0;
+    events.forEach(event => {
+      const row = document.createElement('li');
+      row.className = 'quarrels-history-item';
+      const badge = document.createElement('span');
+      badge.className = 'quarrels-event-badge';
+      badge.textContent = event.delta > 0 ? '+' + event.delta : String(event.delta).replace('-', '−');
+      const copy = document.createElement('div');
+      const title = document.createElement('span');
+      title.className = 'quarrels-event-title';
+      title.textContent = event.delta > 0 ? 'Добавлена ссора' : 'Счётчик уменьшен';
+      const time = document.createElement('time');
+      time.dateTime = event.created_at;
+      const date = new Date(event.created_at);
+      time.textContent = dateFormat.format(date) + ' · ' + timeFormat.format(date) + ' МСК';
+      copy.append(title, time);
+      const total = document.createElement('span');
+      total.className = 'quarrels-event-total';
+      total.textContent = 'Всего: ' + format.format(event.count_after);
+      row.append(badge, copy, total);
+      historyList.append(row);
+    });
+  }
+
   function render(data) {
     if (!Number.isSafeInteger(data.count) || data.count < 0) throw new Error('Invalid counter');
+    renderHistory(data);
     if (data.count !== count) {
       value.textContent = format.format(data.count);
       unit.textContent = units[plural.select(data.count)];
