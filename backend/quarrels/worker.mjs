@@ -1,7 +1,9 @@
 // Cloudflare Worker. Bind a D1 database as DB, then run schema.sql once.
 const origins = new Set([
   'https://sofivita.ru',
+  'http://sofivita.ru',
   'https://www.sofivita.ru',
+  'http://www.sofivita.ru',
   'https://vitaliybatyriev2002-ai.github.io',
 ]);
 
