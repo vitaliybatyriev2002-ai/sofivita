@@ -46,3 +46,15 @@
 .quarrels-history-item time{display:block;margin-top:3px;color:var(--qc-muted);font:400 10px/1.6 Manrope,Arial,sans-serif}
 .quarrels-event-total{color:var(--qc-muted);font:400 10px/1.5 Manrope,Arial,sans-serif;white-space:nowrap}
 @media(max-width:400px){.quarrels-history-item{grid-template-columns:30px minmax(0,1fr);gap:9px}.quarrels-event-badge{width:30px;height:30px}.quarrels-event-total{grid-column:2;margin-top:-6px}.quarrels-history-heading{align-items:flex-start}.quarrels-history-heading>span{font-size:9px}}
+
+.quarrels-actor{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0 0;padding:0;border:0;min-width:0}
+.quarrels-actor legend{float:none;width:100%;margin-bottom:9px;padding:0;color:var(--qc-muted);font:500 11px/1.5 Manrope,Arial,sans-serif}
+.quarrels-actor label{position:relative;cursor:pointer}
+.quarrels-actor input{position:absolute;opacity:0;width:1px;height:1px}
+.quarrels-actor span{display:flex;align-items:center;justify-content:center;min-width:88px;min-height:44px;padding:0 15px;border:1px solid var(--qc-line);border-radius:13px;background:#ffffff66;color:var(--qc-ink);font:500 12px/1.5 Manrope,Arial,sans-serif;transition:background .2s,border-color .2s}
+.quarrels-actor input:checked+span{background:#a76885;color:white;border-color:#a76885;box-shadow:0 4px 12px #a7688520}
+.quarrels-actor input:focus-visible+span{outline:3px solid #a76885;outline-offset:3px}
+.theme-night .quarrels-actor span{background:#201e2b33}
+.theme-night .quarrels-actor input:checked+span{background:#b57896}
+@media(max-width:760px){.quarrels-actor{justify-content:center}.quarrels-actor legend{text-align:center}}
+@media(prefers-reduced-motion:reduce){.quarrels-actor span{transition:none}}

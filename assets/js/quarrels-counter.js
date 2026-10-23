@@ -15,13 +15,15 @@
   const format = new Intl.NumberFormat('ru-RU');
   const plural = new Intl.PluralRules('ru-RU');
   const units = { one: 'ссора', few: 'ссоры', many: 'ссор', other: 'ссоры' };
+  const actors = [...card.querySelectorAll('[data-quarrels-actor]')];
+  let actor = null;
   let count = null;
   let pending = false;
   let apiUrl = null;
 
   function updateButtons() {
     buttons.forEach(button => {
-      button.disabled = !apiUrl || pending || count === null ||
+      button.disabled = !apiUrl || !actor || pending || count === null ||
         (button.dataset.quarrelsDelta === '-1' && count === 0) ||
         (button.dataset.quarrelsDelta === '1' && count === Number.MAX_SAFE_INTEGER);
     });
@@ -61,11 +63,13 @@
       const copy = document.createElement('div');
       const title = document.createElement('span');
       title.className = 'quarrels-event-title';
-      title.textContent = event.delta > 0 ? 'Добавлена ссора' : 'Счётчик уменьшен';
+      const name = { vitalya: 'Виталя', sonya: 'Соня' }[event.actor];
+      title.textContent = (event.delta > 0 ? 'Добавлена ссора' : 'Счётчик уменьшен') + (name ? ' · ' + name : '');
       const time = document.createElement('time');
-      time.dateTime = event.created_at;
+      const forgotten = event.id >= 1 && event.id <= 9 && event.delta > 0;
+      if (!forgotten) time.dateTime = event.created_at;
       const date = new Date(event.created_at);
-      time.textContent = dateFormat.format(date) + ' · ' + timeFormat.format(date) + ' МСК';
+      time.textContent = forgotten ? 'время забыто, время утекло, окда)' : dateFormat.format(date) + ' · ' + timeFormat.format(date) + ' МСК';
       copy.append(title, time);
       const total = document.createElement('span');
       total.className = 'quarrels-event-total';
@@ -88,13 +92,13 @@
   }
 
   async function refresh(delta = null) {
-    if (pending || (delta !== null && !apiUrl)) return;
+    if (pending || (delta !== null && (!apiUrl || !actor))) return;
     pending = true;
     updateButtons();
     try {
       const options = delta === null ? {} : {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ delta }),
+        body: JSON.stringify({ delta, actor }),
       };
       render(await read(apiUrl || dataUrl, options));
       status.textContent = apiUrl ? '' : 'Кнопки скоро заработают ♡';
@@ -122,6 +126,7 @@
     await refresh();
   }
 
+  actors.forEach(input => input.addEventListener('change', () => { actor = input.value; updateButtons(); }));
   buttons.forEach(button => button.addEventListener('click', () => refresh(Number(button.dataset.quarrelsDelta))));
   start();
   setInterval(() => { if (!document.hidden) refresh(); }, 15000);

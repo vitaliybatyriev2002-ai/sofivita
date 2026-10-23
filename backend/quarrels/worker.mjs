@@ -45,7 +45,9 @@ export default {
     try {
       // Idempotent migration preserves the existing counter; timestamps are server-generated.
       await env.DB.batch([env.DB.prepare(historyTable), env.DB.prepare(historyTrigger)]);
+      await env.DB.prepare('CREATE TABLE IF NOT EXISTS quarrel_event_authors (event_id INTEGER PRIMARY KEY, actor TEXT NOT NULL)').run();
       let statement;
+      let actor = null;
       if (request.method === 'POST') {
         if (!allowed) return reply({ error: 'Origin required' }, 403);
         if (!request.headers.get('Content-Type')?.startsWith('application/json')) {
@@ -55,21 +57,28 @@ export default {
         if (body.length > 128) return reply({ error: 'Body too large' }, 413);
         let data;
         try { data = JSON.parse(body); } catch { return reply({ error: 'Invalid JSON' }, 400); }
+        if (data?.actor != null && !['vitalya', 'sonya'].includes(data.actor)) return reply({ error: 'Invalid actor' }, 400);
+        actor = data.actor || null;
         if (data?.delta !== 1 && data?.delta !== -1) return reply({ error: 'Invalid delta' }, 400);
         // One atomic update: simultaneous clicks cannot overwrite each other.
         statement = env.DB.prepare(
-          'UPDATE quarrels SET count = min(9007199254740991, max(0, count + ?)) WHERE id = 1 RETURNING count'
-        ).bind(data.delta);
+          'UPDATE quarrels SET count = min(9007199254740991, max(0, count + ?)) WHERE id = 1 AND count + ? BETWEEN 0 AND 9007199254740991 RETURNING count'
+        ).bind(data.delta, data.delta);
       } else {
         statement = env.DB.prepare('SELECT count FROM quarrels WHERE id = 1');
       }
-      const result = await env.DB.batch([
-        statement,
-        env.DB.prepare('SELECT id, delta, count_after, created_at FROM quarrel_events ORDER BY id DESC LIMIT 30'),
-      ]);
-      const row = result[0].results[0];
+      const statements = [statement];
+      if (request.method === 'POST') {
+        statements.push(env.DB.prepare(
+          'INSERT INTO quarrel_event_authors (event_id, actor) SELECT id, ? FROM quarrel_events WHERE id = (SELECT max(id) FROM quarrel_events) AND changes() > 0 AND ? IS NOT NULL'
+        ).bind(actor, actor));
+      }
+      statements.push(env.DB.prepare('SELECT count FROM quarrels WHERE id = 1'));
+      statements.push(env.DB.prepare('SELECT e.id, e.delta, e.count_after, e.created_at, a.actor FROM quarrel_events e LEFT JOIN quarrel_event_authors a ON a.event_id = e.id ORDER BY e.id DESC LIMIT 30'));
+      const result = await env.DB.batch(statements);
+      const row = result[result.length - 2].results[0];
       if (!row || !Number.isSafeInteger(row.count) || row.count < 0) throw new Error('Database not initialized');
-      return reply({ count: row.count, history: result[1].results });
+      return reply({ count: row.count, history: result[result.length - 1].results });
     } catch {
       return reply({ error: 'Counter unavailable' }, 503);
     }
