@@ -128,3 +128,13 @@ python3 scripts/render-train-assets.py
 
 - https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages
 - https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site
+
+
+## Общий счётчик ссор
+
+Число для всех посетителей хранится в `assets/data/quarrels.json` в поле `count`.
+Начальное значение — 0. Чтобы изменить его, отредактируй это число в репозитории
+и сохрани commit: после публикации Pages все устройства получат одно значение.
+Счётчик проверяет обновления раз в минуту и при возвращении на вкладку.
+Локальное хранилище телефона не используется. При ошибке число не сбрасывается.
+Публикация идёт существующим способом из ветки `main`, папка `/ (root)`.
