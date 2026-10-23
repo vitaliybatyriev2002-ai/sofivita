@@ -22,3 +22,14 @@
 @media(max-width:1250px){.quarrels-section{margin-left:6%;margin-right:6%}}
 @media(max-width:700px){.quarrels-section{margin-bottom:40px}.quarrels-card{padding:25px 23px;gap:22px;flex-direction:column;align-items:flex-start;border-radius:21px}.quarrels-title{font-size:32px}.quarrels-value-wrap{align-self:center;min-width:145px;padding:9px 18px 14px}.quarrels-value{font-size:67px}.quarrels-caption{max-width:300px}}
 @media(prefers-reduced-motion:reduce){.quarrels-value.counter-updated{animation:none}}
+
+.quarrels-controls{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.quarrels-button{position:relative;z-index:1;width:46px;height:46px;flex:0 0 46px;display:grid;place-items:center;padding:0;border:1px solid #c88ca255;border-radius:50%;background:#fff8f7;color:#a46680;font:400 27px/1 Manrope,Arial,sans-serif;cursor:pointer;transition:transform .2s ease,background .2s ease,box-shadow .2s ease}
+.quarrels-button:hover:enabled{background:#f7dce7;box-shadow:0 4px 14px #a466801c;transform:translateY(-2px)}
+.quarrels-button:active:enabled{transform:scale(.94)}
+.quarrels-button:focus-visible{outline:3px solid #a46680;outline-offset:4px}
+.quarrels-button:disabled{opacity:.4;cursor:default}
+.theme-night .quarrels-button{background:#493545;color:#efb4ce;border-color:#efc7d34a}
+.theme-night .quarrels-button:hover:enabled{background:#654459}
+@media(max-width:700px){.quarrels-controls{align-self:center;max-width:100%;gap:4px}.quarrels-controls .quarrels-value-wrap{min-width:110px;padding-left:10px;padding-right:10px}.quarrels-button{width:44px;height:44px;flex-basis:44px}}
+@media(prefers-reduced-motion:reduce){.quarrels-button{transition:none}}

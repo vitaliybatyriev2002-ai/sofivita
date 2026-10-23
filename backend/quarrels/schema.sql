@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS quarrels (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  count INTEGER NOT NULL CHECK (count >= 0 AND count <= 9007199254740991)
+);
+INSERT OR IGNORE INTO quarrels (id, count) VALUES (1, 0);
