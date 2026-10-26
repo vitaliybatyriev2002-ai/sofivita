@@ -21,6 +21,44 @@ BEGIN
   VALUES (NEW.count - OLD.count, NEW.count, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'));
 END`;
 
+async function messenger(request, env, reply, allowed) {
+  // A shared secret is configured in Cloudflare, never embedded in public site files.
+  if (typeof env.CHAT_PASSWORD !== 'string' || env.CHAT_PASSWORD.length < 8) return reply({ error: 'Chat access not configured' }, 503);
+  const token = request.headers.get('Authorization') || '';
+  const encoder = new TextEncoder();
+  const hashes = await Promise.all([token, 'Bearer ' + env.CHAT_PASSWORD].map(value => crypto.subtle.digest('SHA-256', encoder.encode(value))));
+  const left = new Uint8Array(hashes[0]), right = new Uint8Array(hashes[1]);
+  let mismatch = 0;
+  for (let i = 0; i < left.length; i++) mismatch |= left[i] ^ right[i];
+  if (mismatch) return reply({ error: 'Access denied' }, 401);
+  if (!['GET', 'POST'].includes(request.method)) return reply({ error: 'Method not allowed' }, 405);
+  try {
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS couple_messages (
+      seq INTEGER PRIMARY KEY AUTOINCREMENT,
+      id TEXT NOT NULL UNIQUE,
+      actor TEXT NOT NULL CHECK (actor IN ('vitalya', 'sonya')),
+      text TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    )`).run();
+    const statements = [];
+    if (request.method === 'POST') {
+      if (!allowed) return reply({ error: 'Origin required' }, 403);
+      if (!request.headers.get('Content-Type')?.startsWith('application/json')) return reply({ error: 'JSON required' }, 415);
+      const body = await request.text();
+      if (body.length > 8192) return reply({ error: 'Body too large' }, 413);
+      let data;
+      try { data = JSON.parse(body); } catch { return reply({ error: 'Invalid JSON' }, 400); }
+      if (!['vitalya', 'sonya'].includes(data?.actor) || typeof data.text !== 'string' || !data.text.trim() || data.text.trim().length > 1000 || typeof data.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(data.id)) {
+        return reply({ error: 'Invalid message' }, 400);
+      }
+      statements.push(env.DB.prepare('INSERT OR IGNORE INTO couple_messages (id, actor, text) VALUES (?, ?, ?)').bind(data.id, data.actor, data.text.trim()));
+    }
+    statements.push(env.DB.prepare('SELECT id, actor, text, created_at FROM (SELECT seq, id, actor, text, created_at FROM couple_messages ORDER BY seq DESC LIMIT 50) ORDER BY seq ASC'));
+    const results = await env.DB.batch(statements);
+    return reply({ messages: results[results.length - 1].results });
+  } catch { return reply({ error: 'Messenger unavailable' }, 503); }
+}
+
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin');
@@ -37,9 +75,10 @@ export default {
       return new Response(null, { status: 204, headers: {
         ...headers,
         'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       }});
     }
+    if (new URL(request.url).pathname === '/messages') return messenger(request, env, reply, allowed);
     if (new URL(request.url).pathname !== '/counter') return reply({ error: 'Not found' }, 404);
     if (!['GET', 'POST'].includes(request.method)) return reply({ error: 'Method not allowed' }, 405);
     try {
